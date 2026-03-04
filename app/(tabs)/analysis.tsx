@@ -24,6 +24,8 @@ export default function AnalysisScreen() {
   const bufferedStepsRef = useRef<Map<number, ThinkingStep>>(new Map());
   const nextOrderRef = useRef(0);
   const initialPlayedRef = useRef(false);
+  const runIdRef = useRef(0);
+  const hasFinalAnswerRef = useRef(false);
 
   const {
     activeSourceId,
@@ -34,6 +36,7 @@ export default function AnalysisScreen() {
     lastError,
     setSession,
     startStreaming,
+    activateSource,
     revealStep,
     completeStreaming,
     failStreaming,
@@ -81,24 +84,47 @@ export default function AnalysisScreen() {
     }
   }, [revealStep]);
 
+  const flushRemainingSteps = useCallback(() => {
+    const remaining = [...bufferedStepsRef.current.values()].sort((left, right) => left.order - right.order);
+    remaining.forEach((step) => {
+      revealStep(step.order, step.sourceId);
+      nextOrderRef.current = Math.max(nextOrderRef.current, step.order + 1);
+    });
+    bufferedStepsRef.current.clear();
+  }, [revealStep]);
+
   const handleStreamEvent = useCallback(
-    async (event: AnalysisStreamEvent) => {
+    async (event: AnalysisStreamEvent, runId: number) => {
+      if (runId !== runIdRef.current) {
+        return;
+      }
+
+      if (event.type === "source_activated") {
+        activateSource(event.sourceId);
+        return;
+      }
+
       if (event.type === "step") {
         bufferedStepsRef.current.set(event.step.order, event.step);
         flushBufferedSteps();
+        return;
       }
 
       if (event.type === "final_answer") {
+        flushBufferedSteps();
+        flushRemainingSteps();
+        hasFinalAnswerRef.current = true;
         completeStreaming(event.result);
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        return;
       }
 
       if (event.type === "error") {
         failStreaming(event.message);
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
       }
     },
-    [completeStreaming, failStreaming, flushBufferedSteps],
+    [activateSource, completeStreaming, failStreaming, flushBufferedSteps, flushRemainingSteps],
   );
 
   const startAnalysis = useCallback(
@@ -107,6 +133,9 @@ export default function AnalysisScreen() {
         return;
       }
 
+      const runId = runIdRef.current + 1;
+      runIdRef.current = runId;
+      hasFinalAnswerRef.current = false;
       cleanupRef.current?.();
       cleanupRef.current = null;
       bufferedStepsRef.current.clear();
@@ -129,18 +158,36 @@ export default function AnalysisScreen() {
           },
           scenarioId: example.id,
         });
+
+        if (runId !== runIdRef.current) {
+          return;
+        }
+
         setSession(session);
 
         cleanupRef.current = streamAnalysisSession(session.sessionId, {
           onEvent: (event) => {
-            handleStreamEvent(event);
+            void handleStreamEvent(event, runId);
           },
           onError: (message) => {
+            if (runId !== runIdRef.current) {
+              return;
+            }
             failStreaming(message);
           },
-          onDone: () => undefined,
+          onDone: () => {
+            if (runId !== runIdRef.current) {
+              return;
+            }
+            if (!hasFinalAnswerRef.current) {
+              failStreaming("Analysis stream ended before a final answer was received.");
+            }
+          },
         });
       } catch (streamError) {
+        if (runId !== runIdRef.current) {
+          return;
+        }
         failStreaming(streamError instanceof Error ? streamError.message : "분석 시작 실패");
       }
     },
@@ -156,6 +203,8 @@ export default function AnalysisScreen() {
 
   useEffect(() => {
     return () => {
+      runIdRef.current += 1;
+      hasFinalAnswerRef.current = false;
       cleanupRef.current?.();
       resetPlayback();
     };
@@ -203,7 +252,7 @@ export default function AnalysisScreen() {
 
           <View style={styles.questionBubbleWrap}>
             <View style={styles.questionBubble}>
-              <Text style={styles.questionText}>“{activeExample.question}”</Text>
+              <Text style={styles.questionText}>{activeExample.question}</Text>
             </View>
           </View>
 
@@ -296,3 +345,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+

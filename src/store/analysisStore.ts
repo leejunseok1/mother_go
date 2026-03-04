@@ -13,6 +13,7 @@ interface AnalysisStoreState {
   isAnimating: boolean;
   setSession: (session: AnalysisSession | null) => void;
   startStreaming: () => void;
+  activateSource: (sourceId: DataSourceId) => void;
   revealStep: (stepIndex: number, sourceId: DataSourceId) => void;
   completeStreaming: (result: AnalysisResult) => void;
   failStreaming: (message: string) => void;
@@ -36,6 +37,11 @@ export const useAnalysisStore = create<AnalysisStoreState>((set) => ({
       activeSourceId: null,
       isAnimating: true,
       lastResult: null,
+    }),
+  activateSource: (sourceId) =>
+    set({
+      activeSourceId: sourceId,
+      isAnimating: true,
     }),
   revealStep: (stepIndex, sourceId) =>
     set({
