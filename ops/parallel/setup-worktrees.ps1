@@ -6,11 +6,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Assert-GitAvailable {
+function Resolve-GitCommand {
   $gitCmd = Get-Command git -ErrorAction SilentlyContinue
-  if (-not $gitCmd) {
-    throw "git is not available in PATH. Install git or run this script in a shell where git is available."
+  if ($gitCmd) {
+    return $gitCmd.Source
   }
+
+  $candidates = @(
+    "C:\Program Files\Git\cmd\git.exe",
+    "C:\Program Files\Git\bin\git.exe",
+    "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+  )
+
+  foreach ($candidate in $candidates) {
+    if ($candidate -and (Test-Path $candidate)) {
+      return $candidate
+    }
+  }
+
+  throw "git executable was not found. Install git or add it to PATH."
 }
 
 function Assert-ExitCode([string]$Message) {
@@ -19,16 +33,16 @@ function Assert-ExitCode([string]$Message) {
   }
 }
 
-Assert-GitAvailable
+$GitExe = Resolve-GitCommand
 
-$repoRoot = (& git rev-parse --show-toplevel).Trim()
+$repoRoot = (& $GitExe rev-parse --show-toplevel).Trim()
 Assert-ExitCode "Could not resolve git repository root."
 
 if (-not $repoRoot) {
   throw "Could not resolve git repository root."
 }
 
-& git -C $repoRoot rev-parse --verify --quiet $BaseBranch *> $null
+& $GitExe -C $repoRoot rev-parse --verify --quiet $BaseBranch *> $null
 if ($LASTEXITCODE -ne 0) {
   throw "Base branch '$BaseBranch' was not found locally. Fetch or create it first."
 }
@@ -70,14 +84,14 @@ foreach ($target in $targets) {
     continue
   }
 
-  & git -C $repoRoot rev-parse --verify --quiet "refs/heads/$branch" *> $null
+  & $GitExe -C $repoRoot rev-parse --verify --quiet "refs/heads/$branch" *> $null
   $branchExists = ($LASTEXITCODE -eq 0)
 
   if ($branchExists) {
-    & git -C $repoRoot worktree add $path $branch
+    & $GitExe -C $repoRoot worktree add $path $branch
     Assert-ExitCode "Failed to create worktree for existing branch '$branch'."
   } else {
-    & git -C $repoRoot worktree add -b $branch $path $BaseBranch
+    & $GitExe -C $repoRoot worktree add -b $branch $path $BaseBranch
     Assert-ExitCode "Failed to create worktree and branch '$branch' from '$BaseBranch'."
   }
 
@@ -86,7 +100,7 @@ foreach ($target in $targets) {
 
 Write-Host ""
 Write-Host "Worktree status:"
-& git -C $repoRoot worktree list
+& $GitExe -C $repoRoot worktree list
 Assert-ExitCode "Failed to list worktrees."
 Write-Host ""
 Write-Host "Next steps:"

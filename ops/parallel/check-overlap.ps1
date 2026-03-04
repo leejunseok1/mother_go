@@ -9,17 +9,35 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$gitCmd = Get-Command git -ErrorAction SilentlyContinue
-if (-not $gitCmd) {
-  throw "git is not available in PATH."
+function Resolve-GitCommand {
+  $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+  if ($gitCmd) {
+    return $gitCmd.Source
+  }
+
+  $candidates = @(
+    "C:\Program Files\Git\cmd\git.exe",
+    "C:\Program Files\Git\bin\git.exe",
+    "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+  )
+
+  foreach ($candidate in $candidates) {
+    if ($candidate -and (Test-Path $candidate)) {
+      return $candidate
+    }
+  }
+
+  throw "git executable was not found. Install git or add it to PATH."
 }
 
-$repoRoot = (& git rev-parse --show-toplevel).Trim()
+$GitExe = Resolve-GitCommand
+
+$repoRoot = (& $GitExe rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $repoRoot) {
   throw "Current directory is not inside a git repository."
 }
 
-& git -C $repoRoot rev-parse --verify --quiet $BaseBranch *> $null
+& $GitExe -C $repoRoot rev-parse --verify --quiet $BaseBranch *> $null
 if ($LASTEXITCODE -ne 0) {
   throw "Base branch '$BaseBranch' does not exist."
 }
@@ -27,13 +45,13 @@ if ($LASTEXITCODE -ne 0) {
 $changesByBranch = @{}
 
 foreach ($branch in $Branches) {
-  & git -C $repoRoot rev-parse --verify --quiet $branch *> $null
+  & $GitExe -C $repoRoot rev-parse --verify --quiet $branch *> $null
   if ($LASTEXITCODE -ne 0) {
     Write-Host "[skip] branch not found: $branch"
     continue
   }
 
-  $files = (& git -C $repoRoot diff --name-only "$BaseBranch...$branch") |
+  $files = (& $GitExe -C $repoRoot diff --name-only "$BaseBranch...$branch") |
     Where-Object { $_ -and $_.Trim().Length -gt 0 } |
     Sort-Object -Unique
 
@@ -59,11 +77,11 @@ for ($i = 0; $i -lt $branchList.Count; $i++) {
     $overlap = $leftFiles | Where-Object { $rightFiles -contains $_ } | Sort-Object -Unique
 
     if ($overlap.Count -eq 0) {
-      Write-Host "[ok]   $left vs $right: no overlap"
+      Write-Host "[ok]   ${left} vs ${right}: no overlap"
       continue
     }
 
-    Write-Host "[warn] $left vs $right: $($overlap.Count) overlapping file(s)"
+    Write-Host "[warn] ${left} vs ${right}: $($overlap.Count) overlapping file(s)"
     $overlap | ForEach-Object { Write-Host "       - $_" }
   }
 }
