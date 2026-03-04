@@ -38,6 +38,8 @@ Prompt files:
 - `ops/parallel/prompts/agent-b-analysis.md`
 - `ops/parallel/prompts/agent-c-answer-history.md`
 - `ops/parallel/kickoff-round1.md` (ready-to-paste first round commands)
+- `ops/parallel/kickoff-round3.md` (ready-to-paste current round commands)
+- `ops/parallel/smoke-round3.md` (post-merge smoke checklist)
 
 In each session, paste the matching prompt and let it implement changes in its own scope only.
 
@@ -70,6 +72,9 @@ Then run:
 ```powershell
 npm run typecheck
 ```
+
+For round-based execution, create a new kickoff markdown file per round
+(`kickoff-roundN.md`) and keep prompts scoped by ownership to avoid overlap.
 
 Optional final sanity run:
 
