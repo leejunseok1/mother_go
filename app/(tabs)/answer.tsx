@@ -13,7 +13,7 @@ import { colors, radius, spacing } from "@/theme/tokens";
 
 export default function AnswerScreen() {
   const router = useRouter();
-  const { data } = useSourcesQuery();
+  const { data, refetch, isFetching } = useSourcesQuery();
   const { answerStatus, lastResult, lastError } = useAnalysisStore();
   const sources = data ?? [];
   const showEmpty = answerStatus === "idle" || (answerStatus === "done" && !lastResult);
@@ -49,6 +49,16 @@ export default function AnswerScreen() {
           <AnswerBubble result={lastResult} />
           <UsedSourceBadges sourceIds={lastResult.usedSources} sources={sources} />
 
+          <View style={styles.utilityRow}>
+            <ActionButton
+              label={isFetching ? "Refreshing sources..." : "Refresh Sources"}
+              disabled={isFetching}
+              onPress={() => {
+                refetch();
+              }}
+            />
+          </View>
+
           <View style={styles.nextActionCard}>
             <Text style={styles.nextActionTitle}>Recommended next actions</Text>
             {lastResult.nextActions.map((action) => (
@@ -72,6 +82,9 @@ export default function AnswerScreen() {
 }
 
 const styles = StyleSheet.create({
+  utilityRow: {
+    gap: spacing.sm,
+  },
   nextActionCard: {
     borderWidth: 1,
     borderColor: "rgba(74,222,128,0.35)",

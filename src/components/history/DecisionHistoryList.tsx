@@ -9,10 +9,14 @@ interface DecisionHistoryListProps {
 }
 
 export function DecisionHistoryList({ items, sources }: DecisionHistoryListProps) {
+  const sortedItems = [...items].sort(
+    (left, right) => new Date(right.askedAt).getTime() - new Date(left.askedAt).getTime(),
+  );
+
   return (
     <View style={styles.wrapper}>
       <Text style={styles.title}>Recent decisions ({items.length})</Text>
-      {items.map((item) => (
+      {sortedItems.map((item) => (
         <AdviceHistoryItem key={item.id} item={item} sources={sources} />
       ))}
     </View>
