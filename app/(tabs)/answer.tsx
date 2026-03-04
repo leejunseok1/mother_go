@@ -21,15 +21,15 @@ export default function AnswerScreen() {
   return (
     <Screen>
       <SectionTitle
-        title="답변 상세"
-        subtitle="최종 답변과 근거 데이터, 리스크 안내, 다음 행동까지 한 화면에서 확인합니다."
+        title="Answer Detail"
+        subtitle="Review the final answer, risk notice, evidence sources, and next actions in one place."
       />
 
-      {answerStatus === "loading" ? <LoadingBlock label="답변 생성 중..." /> : null}
+      {answerStatus === "loading" ? <LoadingBlock label="Generating answer..." /> : null}
 
       {answerStatus === "error" ? (
         <ErrorBlock
-          message={lastError ?? "답변 생성 중 오류가 발생했습니다."}
+          message={lastError ?? "An error occurred while generating the answer."}
           onRetry={() => {
             router.push("/analysis");
           }}
@@ -38,9 +38,9 @@ export default function AnswerScreen() {
 
       {showEmpty ? (
         <EmptyBlock
-          title="아직 생성된 답변이 없습니다"
-          description="분석 탭에서 질문을 선택해 교차 분석을 실행해주세요."
-          action={<ActionButton label="분석하러 가기" onPress={() => router.push("/analysis")} />}
+          title="No answer has been generated yet"
+          description="Run an analysis scenario first. The final answer will appear here as soon as the stream is complete."
+          action={<ActionButton label="Go To Analysis" onPress={() => router.push("/analysis")} />}
         />
       ) : null}
 
@@ -50,16 +50,21 @@ export default function AnswerScreen() {
           <UsedSourceBadges sourceIds={lastResult.usedSources} sources={sources} />
 
           <View style={styles.nextActionCard}>
-            <Text style={styles.nextActionTitle}>다음 행동 제안</Text>
+            <Text style={styles.nextActionTitle}>Recommended next actions</Text>
             {lastResult.nextActions.map((action) => (
               <Text key={action} style={styles.nextActionItem}>
-                • {action}
+                - {action}
               </Text>
             ))}
           </View>
 
           <GeneralVsDeundeunCard />
           <KeyPointList />
+
+          <View style={styles.footerButtons}>
+            <ActionButton label="Run Another Analysis" onPress={() => router.push("/analysis")} />
+            <ActionButton label="Open History" onPress={() => router.push("/history")} />
+          </View>
         </>
       ) : null}
     </Screen>
@@ -84,5 +89,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 13,
     lineHeight: 19,
+  },
+  footerButtons: {
+    gap: spacing.sm,
   },
 });

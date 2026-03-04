@@ -11,12 +11,13 @@ export function AnswerBubble({ result }: AnswerBubbleProps) {
   return (
     <View style={styles.row}>
       <LinearGradient colors={["#2E7D32", "#4CAF50"]} style={styles.avatar}>
-        <Text style={styles.avatarText}>든</Text>
+        <Text style={styles.avatarText}>AI</Text>
       </LinearGradient>
       <View style={styles.bubble}>
+        <Text style={styles.answerTitle}>Final answer</Text>
         <Text style={styles.answerText}>{result.answer}</Text>
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeLabel}>리스크 안내</Text>
+          <Text style={styles.noticeLabel}>Risk notice</Text>
           <Text style={styles.noticeText}>{result.riskNotice}</Text>
         </View>
       </View>
@@ -40,7 +41,7 @@ const styles = StyleSheet.create({
   avatarText: {
     color: "white",
     fontWeight: "800",
-    fontSize: 15,
+    fontSize: 13,
   },
   bubble: {
     flex: 1,
@@ -52,6 +53,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     gap: spacing.sm,
+  },
+  answerTitle: {
+    color: colors.success,
+    fontWeight: "800",
+    fontSize: 12,
+    letterSpacing: 0.3,
   },
   answerText: {
     color: colors.textPrimary,

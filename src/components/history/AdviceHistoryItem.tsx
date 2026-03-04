@@ -24,7 +24,7 @@ export function AdviceHistoryItem({ item, sources }: AdviceHistoryItemProps) {
       </View>
       <Text style={styles.preview}>{item.answerPreview}</Text>
       <View style={styles.metaRow}>
-        <Text style={styles.meta}>권장: {item.recommendedAction}</Text>
+        <Text style={styles.meta}>Recommendation: {item.recommendedAction}</Text>
         <Text style={styles.meta}>{date}</Text>
       </View>
       <View style={styles.badges}>
@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: spacing.sm,
   },
   meta: {
     color: colors.textMuted,

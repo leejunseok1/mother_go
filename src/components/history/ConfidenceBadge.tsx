@@ -24,7 +24,7 @@ export function ConfidenceBadge({ confidence }: { confidence: number }) {
 
   return (
     <View style={[styles.badge, { backgroundColor: toneMap.bg, borderColor: toneMap.border }]}>
-      <Text style={[styles.text, { color: toneMap.text }]}>신뢰도 {pct}%</Text>
+      <Text style={[styles.text, { color: toneMap.text }]}>Confidence {pct}%</Text>
     </View>
   );
 }
