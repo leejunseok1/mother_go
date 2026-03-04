@@ -5,20 +5,20 @@ import { withAlpha } from "@/lib/color";
 const ITEMS = [
   {
     num: "01",
-    title: "단일 데이터로는 틀린 답변",
-    desc: "주식 데이터만 보면 팔아도 되지만, 세금/건보료까지 보면 지금 매도는 손해일 수 있습니다.",
+    title: "Single-source answers are fragile",
+    desc: "Stock-only logic can miss tax and premium effects. Cross-checking prevents misleading one-dimensional advice.",
     color: "#3B82F6",
   },
   {
     num: "02",
-    title: "상황을 아는 조언",
-    desc: "은퇴 시점, 금융소득 누적, 퇴직금 운용 상태를 함께 보고 맥락화된 조언을 제공합니다.",
+    title: "Context-aware guidance",
+    desc: "Retirement horizon, current income mix, and account allocation shift the best action even for the same market view.",
     color: "#8B5CF6",
   },
   {
     num: "03",
-    title: "신뢰 근거 제시",
-    desc: "과거 유사 상황의 조언 결과와 신뢰도를 함께 제시해 의사결정 근거를 명확히 합니다.",
+    title: "Confidence with evidence",
+    desc: "Recommendation quality increases when historical outcomes and source provenance are visible with the answer.",
     color: "#10B981",
   },
 ];
@@ -26,7 +26,7 @@ const ITEMS = [
 export function KeyPointList() {
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.title}>🔑 핵심: 왜 교차 분석이 중요한가</Text>
+      <Text style={styles.title}>Why cross-analysis matters</Text>
       {ITEMS.map((item) => (
         <View key={item.num} style={styles.row}>
           <View

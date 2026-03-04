@@ -5,25 +5,24 @@ export function GeneralVsDeundeunCard() {
   return (
     <View style={styles.grid}>
       <View style={[styles.card, styles.generalCard]}>
-        <Text style={styles.generalTitle}>❌ 일반 AI (ChatGPT 등)</Text>
-        <Text style={styles.question}>“삼성전자 팔아야 해?”</Text>
+        <Text style={styles.generalTitle}>Generic AI output</Text>
+        <Text style={styles.question}>"Should I sell this stock now?"</Text>
         <View style={styles.quoteBox}>
           <Text style={styles.generalQuote}>
-            “투자 결정은 개인의 상황에 따라 다릅니다. 삼성전자는 반도체 업황에 따라...”
+            "It depends on your risk profile and market conditions. Consider consulting a financial advisor."
           </Text>
-          <Text style={styles.generalHint}>→ 내 상황을 모르는 일반론</Text>
+          <Text style={styles.generalHint}>- broad guidance, low personal context</Text>
         </View>
       </View>
 
       <View style={[styles.card, styles.deundeunCard]}>
-        <Text style={styles.deundeunTitle}>✅ 든든 AI</Text>
-        <Text style={styles.question}>“삼성전자 팔아야 해?”</Text>
+        <Text style={styles.deundeunTitle}>Deundeun AI output</Text>
+        <Text style={styles.question}>"Should I sell this stock now?"</Text>
         <View style={styles.quoteBox}>
           <Text style={styles.deundeunQuote}>
-            “지금은 안 파시는 게 좋겠어요. +7.6%이고, 팔면{" "}
-            <Text style={styles.warning}>건보료가 올라가요</Text>”
+            "Hold for now. Your gain is positive, and selling today may increase your premium burden."
           </Text>
-          <Text style={styles.deundeunHint}>→ 내 데이터 4개를 교차 분석한 맞춤 답변</Text>
+          <Text style={styles.deundeunHint}>- source-crossed, context-aware recommendation</Text>
         </View>
       </View>
     </View>
@@ -77,10 +76,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 18,
     fontSize: 13,
-  },
-  warning: {
-    color: colors.warning,
-    fontWeight: "800",
   },
   generalHint: {
     color: colors.textMuted,
