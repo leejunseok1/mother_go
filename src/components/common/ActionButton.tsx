@@ -8,12 +8,24 @@ interface ActionButtonProps {
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  accessibilityHint?: string;
 }
 
-export function ActionButton({ label, onPress, style, disabled = false }: ActionButtonProps) {
+export function ActionButton({
+  label,
+  onPress,
+  style,
+  disabled = false,
+  accessibilityHint,
+}: ActionButtonProps) {
   return (
     <Pressable
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
+      hitSlop={4}
       onPress={async () => {
         await Haptics.selectionAsync();
         onPress();
@@ -32,6 +44,7 @@ export function ActionButton({ label, onPress, style, disabled = false }: Action
 
 const styles = StyleSheet.create({
   button: {
+    minHeight: 48,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,

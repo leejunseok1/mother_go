@@ -107,8 +107,23 @@ function DataSourceCardBase({ source, isActive, isUsed, pulseEnabled, onPress }:
           textColor: "#CBD5E1",
         };
 
+  const accessibilityLabel = [
+    source.label,
+    statusMeta.label,
+    modeMeta.text,
+    isActive ? "Expanded" : "Collapsed",
+    isUsed ? "Included in current scenario" : undefined,
+  ]
+    .filter(Boolean)
+    .join(". ");
+
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={isActive ? "Double tap to collapse details." : "Double tap to expand details."}
+      accessibilityState={{ expanded: isActive, selected: isActive }}
+      hitSlop={6}
       onPressIn={() => {
         pressProgress.value = withTiming(1, { duration: 120 });
       }}
