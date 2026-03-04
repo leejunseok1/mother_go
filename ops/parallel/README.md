@@ -37,8 +37,15 @@ Prompt files:
 - `ops/parallel/prompts/agent-a-ui.md`
 - `ops/parallel/prompts/agent-b-analysis.md`
 - `ops/parallel/prompts/agent-c-answer-history.md`
+- `ops/parallel/kickoff-round1.md` (ready-to-paste first round commands)
 
 In each session, paste the matching prompt and let it implement changes in its own scope only.
+
+Optional: open all 4 terminals in one command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ops\parallel\open-terminals.ps1
+```
 
 ## 4) Monitor overlap early
 
