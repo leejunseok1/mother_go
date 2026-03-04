@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Screen } from "@/components/common/Screen";
 import { EmptyBlock, ErrorBlock, LoadingBlock, SectionTitle } from "@/components/common/StateBlocks";
 import { DataSourceGrid } from "@/components/source/DataSourceGrid";
 import { SourceDetailBottomSheet } from "@/components/source/SourceDetailBottomSheet";
 import { useSourcesQuery } from "@/services/queries";
-import { DataSource, DataSourceId } from "@/types/domain";
+import { DataSource, DataSourceId, SourceStatus } from "@/types/domain";
 import { colors, radius, spacing } from "@/theme/tokens";
+
+type SourceFilter = "all" | SourceStatus;
 
 export default function SourcesScreen() {
   const { data, isLoading, isError, error, refetch } = useSourcesQuery();
   const [activeSourceId, setActiveSourceId] = useState<DataSourceId | null>(null);
   const [sheetSource, setSheetSource] = useState<DataSource | null>(null);
+  const [filter, setFilter] = useState<SourceFilter>("all");
 
   useEffect(() => {
-    if (isError) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+    if (!isError) {
+      return;
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
   }, [isError]);
 
   const sources = data ?? [];
@@ -25,22 +29,39 @@ export default function SourcesScreen() {
     () => ({
       total: sources.length,
       connected: sources.filter((source) => source.status === "connected").length,
+      stale: sources.filter((source) => source.status === "stale").length,
       simulated: sources.filter((source) => source.status === "simulated").length,
       errors: sources.filter((source) => source.status === "error").length,
     }),
     [sources],
   );
 
+  const filteredSources = useMemo(() => {
+    if (filter === "all") {
+      return sources;
+    }
+    return sources.filter((source) => source.status === filter);
+  }, [filter, sources]);
+
+  useEffect(() => {
+    if (activeSourceId && !filteredSources.some((source) => source.id === activeSourceId)) {
+      setActiveSourceId(null);
+    }
+    if (sheetSource && !filteredSources.some((source) => source.id === sheetSource.id)) {
+      setSheetSource(null);
+    }
+  }, [activeSourceId, filteredSources, sheetSource]);
+
   return (
     <Screen>
       <SectionTitle
         title="Data Source Hub"
-        subtitle="Open each source card to inspect fields, connection quality, and example records before running cross-analysis."
+        subtitle="Use status filters to isolate risky inputs before running cross-analysis."
       />
 
       <View style={styles.accessibilityNote}>
         <Text style={styles.accessibilityNoteText}>
-          Accessibility: each source card announces its status and mode, then whether details are expanded.
+          Accessibility: source cards announce status and mode, then whether details are expanded.
         </Text>
       </View>
 
@@ -49,13 +70,24 @@ export default function SourcesScreen() {
         <View style={styles.statRow}>
           <StatChip label="Total" value={stats.total} tone="neutral" />
           <StatChip label="Connected" value={stats.connected} tone="good" />
+          <StatChip label="Stale" value={stats.stale} tone="warn" />
           <StatChip label="Simulated" value={stats.simulated} tone="neutral" />
           <StatChip label="Errors" value={stats.errors} tone="bad" />
         </View>
         <Text style={styles.infoDesc}>
-          Tip: Check stale/error sources first, then run analysis with the highest quality mix.
+          Tip: Start with error and stale filters, then switch to connected to validate production-ready sources.
         </Text>
       </View>
+
+      {sources.length > 0 ? (
+        <View style={styles.filterRow}>
+          <FilterChip label="All" active={filter === "all"} onPress={() => setFilter("all")} />
+          <FilterChip label="Connected" active={filter === "connected"} onPress={() => setFilter("connected")} />
+          <FilterChip label="Stale" active={filter === "stale"} onPress={() => setFilter("stale")} />
+          <FilterChip label="Simulated" active={filter === "simulated"} onPress={() => setFilter("simulated")} />
+          <FilterChip label="Error" active={filter === "error"} onPress={() => setFilter("error")} />
+        </View>
+      ) : null}
 
       {isLoading ? <LoadingBlock label="Loading data sources..." /> : null}
 
@@ -73,13 +105,20 @@ export default function SourcesScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && sources.length > 0 ? (
+      {!isLoading && !isError && sources.length > 0 && filteredSources.length === 0 ? (
+        <EmptyBlock
+          title="No sources in this filter"
+          description="Choose another status filter to view source cards."
+        />
+      ) : null}
+
+      {!isLoading && !isError && filteredSources.length > 0 ? (
         <DataSourceGrid
-          sources={sources}
+          sources={filteredSources}
           activeSourceId={activeSourceId}
           onPressSource={(sourceId) => {
             setActiveSourceId((prev) => (prev === sourceId ? null : sourceId));
-            const found = sources.find((source) => source.id === sourceId) ?? null;
+            const found = filteredSources.find((source) => source.id === sourceId) ?? null;
             setSheetSource(found);
           }}
         />
@@ -94,6 +133,29 @@ export default function SourcesScreen() {
   );
 }
 
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label} source filter`}
+      accessibilityHint="Double tap to apply this source status filter."
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[styles.filterChip, active ? styles.filterChipActive : undefined]}
+    >
+      <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : undefined]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function StatChip({
   label,
   value,
@@ -101,7 +163,7 @@ function StatChip({
 }: {
   label: string;
   value: number;
-  tone: "good" | "neutral" | "bad";
+  tone: "good" | "neutral" | "warn" | "bad";
 }) {
   const palette = {
     good: {
@@ -113,6 +175,11 @@ function StatChip({
       bg: "rgba(148,163,184,0.16)",
       border: "rgba(148,163,184,0.4)",
       text: "#CBD5E1",
+    },
+    warn: {
+      bg: "rgba(245,158,11,0.16)",
+      border: "rgba(245,158,11,0.42)",
+      text: "#FCD34D",
     },
     bad: {
       bg: "rgba(239,68,68,0.15)",
@@ -178,4 +245,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.34)",
+    backgroundColor: "rgba(148,163,184,0.14)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  filterChipActive: {
+    borderColor: "rgba(74,222,128,0.42)",
+    backgroundColor: "rgba(74,222,128,0.14)",
+  },
+  filterChipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  filterChipTextActive: {
+    color: colors.success,
+  },
 });
+
