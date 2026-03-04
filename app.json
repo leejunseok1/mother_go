@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "든든 AI MVP",
+    "slug": "deundeun-mobile-mvp",
+    "scheme": "deundeun",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.anonymous.deundeunmobilemvp"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
