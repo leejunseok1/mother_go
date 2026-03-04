@@ -16,6 +16,8 @@ import { useAnalysisStore } from "@/store/analysisStore";
 import { AnalysisStreamEvent, ThinkingStep } from "@/types/domain";
 import { colors, radius, spacing } from "@/theme/tokens";
 
+const STREAM_WATCHDOG_MS = 20000;
+
 export default function AnalysisScreen() {
   const router = useRouter();
   const { data, isLoading, isError, error, refetch } = useSourcesQuery();
@@ -26,6 +28,7 @@ export default function AnalysisScreen() {
   const initialPlayedRef = useRef(false);
   const runIdRef = useRef(0);
   const hasFinalAnswerRef = useRef(false);
+  const streamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     activeSourceId,
@@ -55,6 +58,28 @@ export default function AnalysisScreen() {
 
   const sources = data ?? [];
   const activeExample = CROSS_EXAMPLES[activeExampleIndex] ?? null;
+
+  const clearStreamTimeout = useCallback(() => {
+    if (streamTimeoutRef.current) {
+      clearTimeout(streamTimeoutRef.current);
+      streamTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startStreamTimeout = useCallback(
+    (runId: number) => {
+      clearStreamTimeout();
+      streamTimeoutRef.current = setTimeout(() => {
+        if (runId !== runIdRef.current || hasFinalAnswerRef.current) {
+          return;
+        }
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+        failStreaming("Analysis stream timed out. Please retry.");
+      }, STREAM_WATCHDOG_MS);
+    },
+    [clearStreamTimeout, failStreaming],
+  );
 
   const plannedSteps: ThinkingStep[] = useMemo(
     () =>
@@ -111,6 +136,7 @@ export default function AnalysisScreen() {
       }
 
       if (event.type === "final_answer") {
+        clearStreamTimeout();
         flushBufferedSteps();
         flushRemainingSteps();
         hasFinalAnswerRef.current = true;
@@ -120,11 +146,19 @@ export default function AnalysisScreen() {
       }
 
       if (event.type === "error") {
+        clearStreamTimeout();
         failStreaming(event.message);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
       }
     },
-    [activateSource, completeStreaming, failStreaming, flushBufferedSteps, flushRemainingSteps],
+    [
+      activateSource,
+      clearStreamTimeout,
+      completeStreaming,
+      failStreaming,
+      flushBufferedSteps,
+      flushRemainingSteps,
+    ],
   );
 
   const startAnalysis = useCallback(
@@ -136,6 +170,7 @@ export default function AnalysisScreen() {
       const runId = runIdRef.current + 1;
       runIdRef.current = runId;
       hasFinalAnswerRef.current = false;
+      clearStreamTimeout();
       cleanupRef.current?.();
       cleanupRef.current = null;
       bufferedStepsRef.current.clear();
@@ -173,25 +208,29 @@ export default function AnalysisScreen() {
             if (runId !== runIdRef.current) {
               return;
             }
+            clearStreamTimeout();
             failStreaming(message);
           },
           onDone: () => {
             if (runId !== runIdRef.current) {
               return;
             }
+            clearStreamTimeout();
             if (!hasFinalAnswerRef.current) {
               failStreaming("Analysis stream ended before a final answer was received.");
             }
           },
         });
+        startStreamTimeout(runId);
       } catch (streamError) {
         if (runId !== runIdRef.current) {
           return;
         }
+        clearStreamTimeout();
         failStreaming(streamError instanceof Error ? streamError.message : "분석 시작 실패");
       }
     },
-    [failStreaming, handleStreamEvent, setSession, startStreaming],
+    [clearStreamTimeout, failStreaming, handleStreamEvent, setSession, startStreamTimeout, startStreaming],
   );
 
   useEffect(() => {
@@ -205,10 +244,11 @@ export default function AnalysisScreen() {
     return () => {
       runIdRef.current += 1;
       hasFinalAnswerRef.current = false;
+      clearStreamTimeout();
       cleanupRef.current?.();
       resetPlayback();
     };
-  }, [resetPlayback]);
+  }, [clearStreamTimeout, resetPlayback]);
 
   useEffect(() => {
     if (lastError) {
