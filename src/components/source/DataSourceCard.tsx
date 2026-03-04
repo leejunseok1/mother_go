@@ -22,13 +22,7 @@ interface DataSourceCardProps {
   onPress: () => void;
 }
 
-function DataSourceCardBase({
-  source,
-  isActive,
-  isUsed,
-  pulseEnabled,
-  onPress,
-}: DataSourceCardProps) {
+function DataSourceCardBase({ source, isActive, isUsed, pulseEnabled, onPress }: DataSourceCardProps) {
   const activeProgress = useSharedValue(isActive ? 1 : 0);
   const pressProgress = useSharedValue(0);
   const pulseProgress = useSharedValue(0);
@@ -69,6 +63,50 @@ function DataSourceCardBase({
     transform: [{ scale: 1 + pulseProgress.value * 0.75 }],
   }));
 
+  const statusMeta = {
+    connected: {
+      label: "CONNECTED",
+      bg: "rgba(74,222,128,0.16)",
+      border: "rgba(74,222,128,0.48)",
+      text: "#86EFAC",
+    },
+    stale: {
+      label: "STALE",
+      bg: "rgba(245,158,11,0.15)",
+      border: "rgba(245,158,11,0.45)",
+      text: "#FCD34D",
+    },
+    error: {
+      label: "ERROR",
+      bg: "rgba(239,68,68,0.15)",
+      border: "rgba(239,68,68,0.45)",
+      text: "#FCA5A5",
+    },
+    simulated: {
+      label: "SIMULATED",
+      bg: "rgba(148,163,184,0.15)",
+      border: "rgba(148,163,184,0.4)",
+      text: "#CBD5E1",
+    },
+  }[source.status];
+
+  const modeMeta =
+    source.mode === "real"
+      ? {
+          label: "LIVE",
+          text: "Live linked data",
+          bg: "rgba(59,130,246,0.14)",
+          border: "rgba(59,130,246,0.42)",
+          textColor: "#93C5FD",
+        }
+      : {
+          label: "SIM",
+          text: "Simulated data",
+          bg: "rgba(148,163,184,0.15)",
+          border: "rgba(148,163,184,0.38)",
+          textColor: "#CBD5E1",
+        };
+
   return (
     <Pressable
       onPressIn={() => {
@@ -85,9 +123,19 @@ function DataSourceCardBase({
     >
       <Animated.View style={[styles.glowLayer, { backgroundColor: source.glow }, glowAnimatedStyle]} />
       <Animated.View style={[styles.card, cardAnimatedStyle]}>
+        <View style={styles.badgeRow}>
+          <View style={[styles.tag, { backgroundColor: modeMeta.bg, borderColor: modeMeta.border }]}>
+            <Text style={[styles.tagText, { color: modeMeta.textColor }]}>{modeMeta.label}</Text>
+          </View>
+          <View style={[styles.tag, { backgroundColor: statusMeta.bg, borderColor: statusMeta.border }]}>
+            <Text style={[styles.tagText, { color: statusMeta.text }]}>{statusMeta.label}</Text>
+          </View>
+        </View>
+
         {pulseEnabled ? (
           <Animated.View style={[styles.pulseDot, pulseStyle, { backgroundColor: source.color }]} />
         ) : null}
+
         <View style={styles.headerRow}>
           <Text style={styles.icon}>{source.icon}</Text>
           <View style={styles.headerText}>
@@ -104,12 +152,24 @@ function DataSourceCardBase({
                 <Text style={styles.itemText}>{item}</Text>
               </View>
             ))}
-            <View style={[styles.exampleBox, { borderColor: withAlpha(source.color, "44"), backgroundColor: withAlpha(source.color, "1A") }]}>
-              <Text style={[styles.exampleText, { color: source.color }]}>예) {source.example}</Text>
+            <View
+              style={[
+                styles.exampleBox,
+                { borderColor: withAlpha(source.color, "44"), backgroundColor: withAlpha(source.color, "1A") },
+              ]}
+            >
+              <Text style={[styles.exampleText, { color: source.color }]}>Example: {source.example}</Text>
             </View>
           </View>
         ) : (
-          <Text style={styles.modeText}>{source.mode === "real" ? "실제 연동" : "시뮬레이션"}</Text>
+          <>
+            <Text style={styles.modeText}>{modeMeta.text}</Text>
+            {isUsed ? (
+              <View style={styles.usedBadge}>
+                <Text style={styles.usedBadgeText}>Included in this analysis scenario</Text>
+              </View>
+            ) : null}
+          </>
         )}
       </Animated.View>
     </Pressable>
@@ -136,6 +196,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     overflow: "hidden",
   },
+  badgeRow: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    right: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    zIndex: 2,
+  },
+  tag: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
   pulseDot: {
     position: "absolute",
     top: 12,
@@ -152,6 +232,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     gap: spacing.sm,
+    marginTop: 20,
   },
   icon: {
     fontSize: 24,
@@ -175,7 +256,8 @@ const styles = StyleSheet.create({
   modeText: {
     marginTop: spacing.md,
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   details: {
     marginTop: spacing.sm,
@@ -205,6 +287,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   exampleText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  usedBadge: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(74,222,128,0.35)",
+    backgroundColor: "rgba(74,222,128,0.1)",
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  usedBadgeText: {
+    color: "#86EFAC",
     fontSize: 11,
     fontWeight: "700",
   },
