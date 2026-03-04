@@ -6,7 +6,7 @@ interface PulseSourceHighlightProps {
 }
 
 export function PulseSourceHighlight({
-  label = "점멸 중인 카드는 현재 AI가 참고하는 데이터입니다.",
+  label = "The pulsing card indicates the source currently referenced by the AI.",
 }: PulseSourceHighlightProps) {
   return (
     <View style={styles.wrapper}>
@@ -33,3 +33,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+

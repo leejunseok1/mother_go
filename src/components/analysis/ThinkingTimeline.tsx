@@ -14,7 +14,7 @@ interface ThinkingTimelineProps {
 export function ThinkingTimeline({ steps, visibleStepIndex, sources }: ThinkingTimelineProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🧠 든든의 분석 과정</Text>
+      <Text style={styles.title}>Reasoning Timeline</Text>
       <View style={styles.list}>
         {steps.map((step, index) => {
           const source = sources.find((s) => s.id === step.sourceId);
@@ -100,3 +100,4 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 });
+
