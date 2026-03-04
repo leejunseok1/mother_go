@@ -73,8 +73,16 @@ export default function OnboardingScreen() {
       </View>
 
       <View style={styles.buttonRow}>
-        <ActionButton label="Open Source Hub" onPress={() => router.push("/sources")} />
-        <ActionButton label="Start Analysis" onPress={() => router.push("/analysis")} />
+        <ActionButton
+          label="Open Source Hub"
+          accessibilityHint="Moves to the source list where you can inspect each data source."
+          onPress={() => router.push("/sources")}
+        />
+        <ActionButton
+          label="Start Analysis"
+          accessibilityHint="Moves to the analysis screen and starts scenario playback."
+          onPress={() => router.push("/analysis")}
+        />
       </View>
     </Screen>
   );

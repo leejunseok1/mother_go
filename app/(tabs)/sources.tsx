@@ -38,6 +38,12 @@ export default function SourcesScreen() {
         subtitle="Open each source card to inspect fields, connection quality, and example records before running cross-analysis."
       />
 
+      <View style={styles.accessibilityNote}>
+        <Text style={styles.accessibilityNoteText}>
+          Accessibility: each source card announces its status and mode, then whether details are expanded.
+        </Text>
+      </View>
+
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>Connection Snapshot</Text>
         <View style={styles.statRow}>
@@ -125,6 +131,19 @@ function StatChip({
 }
 
 const styles = StyleSheet.create({
+  accessibilityNote: {
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.35)",
+    borderRadius: radius.md,
+    backgroundColor: "rgba(59,130,246,0.1)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  accessibilityNoteText: {
+    color: "#BFDBFE",
+    fontSize: 12,
+    lineHeight: 18,
+  },
   infoCard: {
     backgroundColor: "rgba(16,185,129,0.1)",
     borderWidth: 1,
