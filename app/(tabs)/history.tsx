@@ -9,16 +9,21 @@ import { DecisionHistoryList } from "@/components/history/DecisionHistoryList";
 import { useHistoryQuery, useSourcesQuery } from "@/services/queries";
 import { colors, radius, spacing } from "@/theme/tokens";
 
+type HistoryFilter = "all" | "hold" | "adjust";
+type HistorySort = "latest" | "oldest" | "confidence";
+
 export default function HistoryScreen() {
   const router = useRouter();
   const historyQuery = useHistoryQuery();
   const sourcesQuery = useSourcesQuery();
-  const [filter, setFilter] = useState<"all" | "hold" | "adjust">("all");
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const [sortBy, setSortBy] = useState<HistorySort>("latest");
 
   useEffect(() => {
-    if (historyQuery.isError) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+    if (!historyQuery.isError) {
+      return;
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
   }, [historyQuery.isError]);
 
   const history = historyQuery.data ?? [];
@@ -32,11 +37,22 @@ export default function HistoryScreen() {
     return history.filter((item) => {
       const action = item.recommendedAction.toLowerCase();
       if (filter === "hold") {
-        return action.includes("보유") || action.includes("hold");
+        return action.includes("hold") || action.includes("보유");
       }
-      return action.includes("조정") || action.includes("adjust");
+      return action.includes("adjust") || action.includes("조정");
     });
   }, [filter, history]);
+
+  const sortedHistory = useMemo(() => {
+    const copied = [...filteredHistory];
+    if (sortBy === "latest") {
+      return copied.sort((a, b) => new Date(b.askedAt).getTime() - new Date(a.askedAt).getTime());
+    }
+    if (sortBy === "oldest") {
+      return copied.sort((a, b) => new Date(a.askedAt).getTime() - new Date(b.askedAt).getTime());
+    }
+    return copied.sort((a, b) => b.confidence - a.confidence);
+  }, [filteredHistory, sortBy]);
 
   const confidenceSummary = useMemo(() => {
     if (history.length === 0) {
@@ -51,7 +67,7 @@ export default function HistoryScreen() {
     <Screen>
       <SectionTitle
         title="History & Confidence"
-        subtitle="Inspect previous recommendations, confidence levels, and which sources were used for each decision."
+        subtitle="Sort and filter previous recommendations to audit decisions faster."
       />
 
       <View style={styles.summaryCard}>
@@ -63,11 +79,23 @@ export default function HistoryScreen() {
       </View>
 
       {history.length > 0 ? (
-        <View style={styles.filterRow}>
-          <FilterChip label="All" active={filter === "all"} onPress={() => setFilter("all")} />
-          <FilterChip label="Hold" active={filter === "hold"} onPress={() => setFilter("hold")} />
-          <FilterChip label="Adjust" active={filter === "adjust"} onPress={() => setFilter("adjust")} />
-        </View>
+        <>
+          <View style={styles.filterRow}>
+            <FilterChip label="All" active={filter === "all"} onPress={() => setFilter("all")} />
+            <FilterChip label="Hold" active={filter === "hold"} onPress={() => setFilter("hold")} />
+            <FilterChip label="Adjust" active={filter === "adjust"} onPress={() => setFilter("adjust")} />
+          </View>
+
+          <View style={styles.sortRow}>
+            <SortChip label="Latest" active={sortBy === "latest"} onPress={() => setSortBy("latest")} />
+            <SortChip label="Oldest" active={sortBy === "oldest"} onPress={() => setSortBy("oldest")} />
+            <SortChip
+              label="High Confidence"
+              active={sortBy === "confidence"}
+              onPress={() => setSortBy("confidence")}
+            />
+          </View>
+        </>
       ) : null}
 
       {historyQuery.isLoading || sourcesQuery.isLoading ? <LoadingBlock label="Loading history..." /> : null}
@@ -89,23 +117,25 @@ export default function HistoryScreen() {
 
       {!historyQuery.isLoading && !historyQuery.isError && history.length > 0 ? (
         <>
-          {filteredHistory.length === 0 ? (
+          {sortedHistory.length === 0 ? (
             <EmptyBlock
               title="No items in this filter"
-              description="Try another recommendation filter or refresh history."
-              action={
-                <ActionButton
-                  label="Refresh History"
-                  onPress={() => {
-                    historyQuery.refetch();
-                    sourcesQuery.refetch();
-                  }}
-                />
-              }
+              description="Reset the filter or refresh history data."
+              action={<ActionButton label="Reset Filter" onPress={() => setFilter("all")} />}
             />
           ) : (
-            <DecisionHistoryList items={filteredHistory} sources={sources} />
+            <DecisionHistoryList items={sortedHistory} sources={sources} />
           )}
+
+          <View style={styles.actionsRow}>
+            <ActionButton
+              label="Refresh History"
+              onPress={() => {
+                historyQuery.refetch();
+                sourcesQuery.refetch();
+              }}
+            />
+          </View>
         </>
       ) : null}
     </Screen>
@@ -124,12 +154,34 @@ function FilterChip({
   return (
     <Pressable
       onPress={onPress}
-      style={[
-        styles.filterChip,
-        active ? styles.filterChipActive : undefined,
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} history filter`}
+      accessibilityState={{ selected: active }}
+      style={[styles.filterChip, active ? styles.filterChipActive : undefined]}
     >
       <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : undefined]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function SortChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} sort`}
+      accessibilityState={{ selected: active }}
+      style={[styles.sortChip, active ? styles.sortChipActive : undefined]}
+    >
+      <Text style={[styles.sortChipText, active ? styles.sortChipTextActive : undefined]}>{label}</Text>
     </Pressable>
   );
 }
@@ -155,6 +207,7 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: "row",
     gap: spacing.sm,
+    flexWrap: "wrap",
   },
   filterChip: {
     borderRadius: 999,
@@ -176,4 +229,33 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: colors.success,
   },
+  sortRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  sortChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.35)",
+    backgroundColor: "rgba(59,130,246,0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  sortChipActive: {
+    borderColor: "rgba(96,165,250,0.5)",
+    backgroundColor: "rgba(59,130,246,0.22)",
+  },
+  sortChipText: {
+    color: "#BFDBFE",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  sortChipTextActive: {
+    color: "#DBEAFE",
+  },
+  actionsRow: {
+    gap: spacing.sm,
+  },
 });
+
