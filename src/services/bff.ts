@@ -27,7 +27,7 @@ export async function fetchSources(): Promise<DataSource[]> {
 
   const res = await fetch(`${BFF_BASE_URL}/v1/sources`);
   if (!res.ok) {
-    throw new Error("데이터 소스 조회에 실패했습니다.");
+    throw new Error("Failed to fetch data sources.");
   }
   const data = (await res.json()) as DataSource[];
   return data;
@@ -41,13 +41,20 @@ export async function fetchHistory(): Promise<HistoryItem[]> {
 
   const res = await fetch(`${BFF_BASE_URL}/v1/history`);
   if (!res.ok) {
-    throw new Error("기록 조회에 실패했습니다.");
+    throw new Error("Failed to fetch history.");
   }
   const data = (await res.json()) as HistoryItem[];
   return data;
 }
 
-export async function createAnalysisSession(request: AnalysisRequest): Promise<AnalysisSession> {
+interface CreateAnalysisSessionOptions {
+  signal?: AbortSignal;
+}
+
+export async function createAnalysisSession(
+  request: AnalysisRequest,
+  options?: CreateAnalysisSessionOptions,
+): Promise<AnalysisSession> {
   if (!BFF_BASE_URL) {
     await wait(220);
     const session: AnalysisSession = {
@@ -64,10 +71,11 @@ export async function createAnalysisSession(request: AnalysisRequest): Promise<A
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
+    signal: options?.signal,
   });
 
   if (!res.ok) {
-    throw new Error("분석 세션 생성에 실패했습니다.");
+    throw new Error("Failed to create analysis session.");
   }
 
   return (await res.json()) as AnalysisSession;
@@ -149,9 +157,7 @@ function dispatchSsePayload(raw: string, callbacks: StreamCallbacks) {
     const payload = JSON.parse(raw) as AnalysisStreamEvent;
     callbacks.onEvent(payload);
   } catch (error) {
-    callbacks.onError(
-      error instanceof Error ? error.message : "스트림 이벤트 파싱에 실패했습니다.",
-    );
+    callbacks.onError(error instanceof Error ? error.message : "Failed to parse stream event.");
   }
 }
 
@@ -173,7 +179,7 @@ export function streamAnalysisSession(sessionId: string, callbacks: StreamCallba
       });
 
       if (!res.ok || !res.body) {
-        callbacks.onError("스트림 연결에 실패했습니다.");
+        callbacks.onError("Failed to connect analysis stream.");
         return;
       }
 
@@ -193,14 +199,10 @@ export function streamAnalysisSession(sessionId: string, callbacks: StreamCallba
         buffer = blocks.pop() ?? "";
 
         blocks.forEach((block) => {
-          const dataLine = block
-            .split("\n")
-            .find((line) => line.startsWith("data:"));
-
+          const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
           if (!dataLine) {
             return;
           }
-
           dispatchSsePayload(dataLine.replace("data:", "").trim(), callbacks);
         });
       }
@@ -208,7 +210,7 @@ export function streamAnalysisSession(sessionId: string, callbacks: StreamCallba
       if (controller.signal.aborted) {
         return;
       }
-      callbacks.onError(error instanceof Error ? error.message : "스트림 오류가 발생했습니다.");
+      callbacks.onError(error instanceof Error ? error.message : "An unknown stream error occurred.");
     }
   })();
 
@@ -216,3 +218,4 @@ export function streamAnalysisSession(sessionId: string, callbacks: StreamCallba
     controller.abort();
   };
 }
+

@@ -22,7 +22,9 @@ export default function AnalysisScreen() {
   const router = useRouter();
   const { data, isLoading, isError, error, refetch } = useSourcesQuery();
   const [activeExampleIndex, setActiveExampleIndex] = useState(0);
+
   const cleanupRef = useRef<(() => void) | null>(null);
+  const createSessionAbortRef = useRef<AbortController | null>(null);
   const bufferedStepsRef = useRef<Map<number, ThinkingStep>>(new Map());
   const nextOrderRef = useRef(0);
   const initialPlayedRef = useRef(false);
@@ -60,10 +62,16 @@ export default function AnalysisScreen() {
   const activeExample = CROSS_EXAMPLES[activeExampleIndex] ?? null;
 
   const clearStreamTimeout = useCallback(() => {
-    if (streamTimeoutRef.current) {
-      clearTimeout(streamTimeoutRef.current);
-      streamTimeoutRef.current = null;
+    if (!streamTimeoutRef.current) {
+      return;
     }
+    clearTimeout(streamTimeoutRef.current);
+    streamTimeoutRef.current = null;
+  }, []);
+
+  const clearPendingSessionRequest = useCallback(() => {
+    createSessionAbortRef.current?.abort();
+    createSessionAbortRef.current = null;
   }, []);
 
   const startStreamTimeout = useCallback(
@@ -79,6 +87,16 @@ export default function AnalysisScreen() {
       }, STREAM_WATCHDOG_MS);
     },
     [clearStreamTimeout, failStreaming],
+  );
+
+  const markStreamActivity = useCallback(
+    (runId: number) => {
+      if (runId !== runIdRef.current || hasFinalAnswerRef.current) {
+        return;
+      }
+      startStreamTimeout(runId);
+    },
+    [startStreamTimeout],
   );
 
   const plannedSteps: ThinkingStep[] = useMemo(
@@ -126,20 +144,22 @@ export default function AnalysisScreen() {
 
       if (event.type === "source_activated") {
         activateSource(event.sourceId);
+        markStreamActivity(runId);
         return;
       }
 
       if (event.type === "step") {
         bufferedStepsRef.current.set(event.step.order, event.step);
         flushBufferedSteps();
+        markStreamActivity(runId);
         return;
       }
 
       if (event.type === "final_answer") {
+        hasFinalAnswerRef.current = true;
         clearStreamTimeout();
         flushBufferedSteps();
         flushRemainingSteps();
-        hasFinalAnswerRef.current = true;
         completeStreaming(event.result);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         return;
@@ -158,6 +178,7 @@ export default function AnalysisScreen() {
       failStreaming,
       flushBufferedSteps,
       flushRemainingSteps,
+      markStreamActivity,
     ],
   );
 
@@ -170,11 +191,15 @@ export default function AnalysisScreen() {
       const runId = runIdRef.current + 1;
       runIdRef.current = runId;
       hasFinalAnswerRef.current = false;
+
       clearStreamTimeout();
+      clearPendingSessionRequest();
       cleanupRef.current?.();
       cleanupRef.current = null;
       bufferedStepsRef.current.clear();
       nextOrderRef.current = 0;
+
+      setSession(null);
       setActiveExampleIndex(index);
       startStreaming();
 
@@ -182,17 +207,30 @@ export default function AnalysisScreen() {
       if (!example) {
         return;
       }
+
+      const createSessionController = new AbortController();
+      createSessionAbortRef.current = createSessionController;
+
       try {
-        const session = await createAnalysisSession({
-          question: example.question,
-          selectedSourceIds: example.sources,
-          locale: "ko-KR",
-          sessionContext: {
-            userAgeBand: "55-60",
-            retirementHorizon: "2년",
+        const session = await createAnalysisSession(
+          {
+            question: example.question,
+            selectedSourceIds: example.sources,
+            locale: "ko-KR",
+            sessionContext: {
+              userAgeBand: "55-60",
+              retirementHorizon: "2y",
+            },
+            scenarioId: example.id,
           },
-          scenarioId: example.id,
-        });
+          {
+            signal: createSessionController.signal,
+          },
+        );
+
+        if (createSessionAbortRef.current === createSessionController) {
+          createSessionAbortRef.current = null;
+        }
 
         if (runId !== runIdRef.current) {
           return;
@@ -221,22 +259,34 @@ export default function AnalysisScreen() {
             }
           },
         });
+
         startStreamTimeout(runId);
       } catch (streamError) {
-        if (runId !== runIdRef.current) {
+        if (createSessionController.signal.aborted || runId !== runIdRef.current) {
           return;
         }
+        if (createSessionAbortRef.current === createSessionController) {
+          createSessionAbortRef.current = null;
+        }
         clearStreamTimeout();
-        failStreaming(streamError instanceof Error ? streamError.message : "분석 시작 실패");
+        failStreaming(streamError instanceof Error ? streamError.message : "Failed to start analysis.");
       }
     },
-    [clearStreamTimeout, failStreaming, handleStreamEvent, setSession, startStreamTimeout, startStreaming],
+    [
+      clearPendingSessionRequest,
+      clearStreamTimeout,
+      failStreaming,
+      handleStreamEvent,
+      setSession,
+      startStreamTimeout,
+      startStreaming,
+    ],
   );
 
   useEffect(() => {
     if (!initialPlayedRef.current && !isLoading && !isError && CROSS_EXAMPLES.length > 0) {
       initialPlayedRef.current = true;
-      startAnalysis(0);
+      void startAnalysis(0);
     }
   }, [isError, isLoading, startAnalysis]);
 
@@ -245,37 +295,39 @@ export default function AnalysisScreen() {
       runIdRef.current += 1;
       hasFinalAnswerRef.current = false;
       clearStreamTimeout();
+      clearPendingSessionRequest();
       cleanupRef.current?.();
       resetPlayback();
     };
-  }, [clearStreamTimeout, resetPlayback]);
+  }, [clearPendingSessionRequest, clearStreamTimeout, resetPlayback]);
 
   useEffect(() => {
-    if (lastError) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+    if (!lastError) {
+      return;
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
   }, [lastError]);
 
   return (
     <Screen>
       <SectionTitle
-        title="교차분석 플레이어"
-        subtitle="질문별로 사고 과정(step)을 순서대로 시각화하고 마지막에 맞춤 답변을 노출합니다."
+        title="Cross Analysis Player"
+        subtitle="Watch source activations and reasoning steps in order, then open the final answer."
       />
 
-      {isLoading ? <LoadingBlock label="분석에 필요한 데이터를 준비하는 중..." /> : null}
+      {isLoading ? <LoadingBlock label="Preparing analysis data..." /> : null}
 
       {isError ? (
         <ErrorBlock
-          message={error instanceof Error ? error.message : "데이터 조회 실패"}
+          message={error instanceof Error ? error.message : "Failed to load analysis data."}
           onRetry={() => refetch()}
         />
       ) : null}
 
       {!isLoading && !isError && CROSS_EXAMPLES.length === 0 ? (
         <EmptyBlock
-          title="분석 시나리오가 없습니다"
-          description="CROSS_EXAMPLES 데이터를 먼저 구성해주세요."
+          title="No analysis scenarios available"
+          description="Add at least one scenario in CROSS_EXAMPLES to start streaming."
         />
       ) : null}
 
@@ -286,7 +338,7 @@ export default function AnalysisScreen() {
             activeIndex={activeExampleIndex}
             disabled={false}
             onSelect={(index) => {
-              startAnalysis(index);
+              void startAnalysis(index);
             }}
           />
 
@@ -310,22 +362,22 @@ export default function AnalysisScreen() {
 
           {answerStatus === "error" && lastError ? (
             <ErrorBlock
-              title="스트림 중단"
+              title="Stream interrupted"
               message={lastError}
               onRetry={() => {
-                startAnalysis(activeExampleIndex);
+                void startAnalysis(activeExampleIndex);
               }}
             />
           ) : null}
 
           {answerStatus === "done" && lastResult ? (
             <Animated.View style={[styles.answerPreview, answerAnimatedStyle]}>
-              <Text style={styles.answerPreviewTitle}>최종 답변 미리보기</Text>
+              <Text style={styles.answerPreviewTitle}>Final Answer Preview</Text>
               <Text style={styles.answerPreviewText} numberOfLines={4}>
                 {lastResult.answer}
               </Text>
               <Pressable style={styles.detailButton} onPress={() => router.push("/answer")}>
-                <Text style={styles.detailButtonText}>답변 상세 보기</Text>
+                <Text style={styles.detailButtonText}>Open Full Answer</Text>
               </Pressable>
             </Animated.View>
           ) : null}
